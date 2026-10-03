@@ -1,99 +1,130 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
-const personA = {
-  name: "Fadi Jiyad VC",
-  summary:
-    "Influencer marketing professional interested in cycling, MMA, boxing, football, cinema, acting, filmmaking and travel.",
-  interests: [
-    "Long-distance cycling",
-    "MMA",
-    "Boxing",
-    "Brazil football",
-    "Cinema",
-    "Acting",
-    "Filmmaking",
-    "Travel",
-  ],
-  professional_interests: [
-    "Influencer marketing",
-    "Brand partnerships",
-    "Creator marketing",
-    "Campaigns",
-    "Content creation",
-  ],
-  hobbies: [
-    "Cycling",
-    "Boxing",
-    "Cinema",
-    "Travel",
-  ],
-  compatibility_factors: [
-    "Active lifestyle",
-    "Creative interests",
-    "Travel",
-    "Content creation",
-  ],
+type Person = {
+  id: number;
+  name: string;
+  linkedin: string;
+  instagram: string;
+  summary?: string;
+  interests?: string[];
+  hobbies?: string[];
+  professional_interests?: string[];
+  skills?: string[];
+  lifestyle_signals?: string[];
+  personality_signals?: string[];
+  conversation_topics?: string[];
+  dating_preferences?: string[];
+  compatibility_factors?: string[];
 };
 
-const personB = {
-  name: "Alex",
-  summary:
-    "Creative and technology-oriented person interested in active lifestyle, travel, cinema and content creation.",
-  interests: [
-    "Fitness",
-    "Travel",
-    "Cinema",
-    "Technology",
-    "Content creation",
-  ],
-  professional_interests: [
-    "Technology",
-    "Creative projects",
-    "Content creation",
-  ],
-  hobbies: [
-    "Fitness",
-    "Travel",
-    "Movies",
-  ],
-  compatibility_factors: [
-    "Active lifestyle",
-    "Travel",
-    "Creative interests",
-    "Curiosity",
-  ],
+type DateResult = {
+  conversation: {
+    agent: string;
+    message: string;
+  }[];
+  result: {
+    compatibility_score: number;
+    decision: string;
+    shared_interests: string[];
+    compatibility_reasons: string[];
+    potential_challenges: string[];
+    summary: string;
+  };
 };
 
-type ConversationMessage = {
-  agent: string;
-  message: string;
-};
+export default function AgentDatePage() {
+  const [people, setPeople] = useState<Person[]>([]);
+  const [personA, setPersonA] = useState<Person | null>(null);
+  const [personB, setPersonB] = useState<Person | null>(null);
 
-type DatingResult = {
-  compatibility_score: number;
-  decision: "continue" | "maybe" | "pass";
-  shared_interests: string[];
-  compatibility_reasons: string[];
-  potential_challenges: string[];
-  summary: string;
-};
-
-type DatingResponse = {
-  conversation: ConversationMessage[];
-  result: DatingResult;
-};
-
-export default function DatePage() {
-  const [date, setDate] = useState<DatingResponse | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [dating, setDating] = useState(false);
+  const [result, setResult] = useState<DateResult | null>(null);
   const [error, setError] = useState("");
 
-  async function startDate() {
-    setLoading(true);
+  useEffect(() => {
+    async function loadPeople() {
+      try {
+       const response = await fetch("/people.json");
+const seededPeople: Person[] = await response.json();
+
+const savedPeople: Person[] = JSON.parse(
+  localStorage.getItem("agentic_dating_people") || "[]"
+);
+
+const data: Person[] = [
+  ...seededPeople,
+  ...savedPeople.filter(
+    (saved) =>
+      !seededPeople.some(
+        (seeded) =>
+          seeded.linkedin === saved.linkedin ||
+          seeded.instagram === saved.instagram
+      )
+  ),
+];
+
+setPeople(data);
+
+        const params = new URLSearchParams(window.location.search);
+
+        const personId = params.get("person");
+        const matchId = params.get("match");
+
+        let selectedA: Person | undefined;
+        let selectedB: Person | undefined;
+
+        if (personId) {
+          selectedA = data.find(
+            (person) => String(person.id) === String(personId)
+          );
+        }
+
+        if (matchId) {
+          selectedB = data.find(
+            (person) => String(person.id) === String(matchId)
+          );
+        }
+
+        if (!selectedA) {
+          selectedA = data[0];
+        }
+
+        if (!selectedB) {
+          selectedB = data.find(
+            (person) => person.id !== selectedA?.id
+          );
+        }
+
+        setPersonA(selectedA || null);
+        setPersonB(selectedB || null);
+      } catch (error) {
+        console.error(error);
+        setError("Failed to load agents.");
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadPeople();
+  }, []);
+
+  async function startAgentDate() {
+    if (!personA || !personB) {
+      setError("Please select two agents.");
+      return;
+    }
+
+    if (personA.id === personB.id) {
+      setError("Please select two different agents.");
+      return;
+    }
+
+    setDating(true);
+    setResult(null);
     setError("");
-    setDate(null);
 
     try {
       const response = await fetch("/api/date-agents", {
@@ -111,502 +142,445 @@ export default function DatePage() {
 
       if (!response.ok || !data.success) {
         throw new Error(
-          data.error || "Dating agents temporarily unavailable"
+          data.error || "Agent date failed."
         );
       }
 
-      setDate(data.date);
-    } catch (err: any) {
-      console.error(err);
+      setResult(data.date);
+    } catch (error: any) {
+      console.error(error);
+
       setError(
-        err?.message || "Something went wrong while starting the date."
+        error?.message ||
+          "The agents could not complete the date."
       );
     } finally {
-      setLoading(false);
+      setDating(false);
     }
   }
 
+  if (loading) {
+    return (
+      <main className="min-h-screen bg-black text-white flex items-center justify-center">
+        Loading agents...
+      </main>
+    );
+  }
+
   return (
-    <main
-      style={{
-        minHeight: "100vh",
-        background: "#080808",
-        color: "#ffffff",
-        padding: "30px 20px 80px",
-        fontFamily: "Arial, sans-serif",
-      }}
-    >
-      <div
-        style={{
-          maxWidth: "900px",
-          margin: "0 auto",
-        }}
-      >
-        {/* Navigation */}
-        <nav
-          style={{
-            display: "flex",
-            gap: "10px",
-            flexWrap: "wrap",
-            marginBottom: "40px",
-          }}
-        >
+    <main className="min-h-screen bg-black text-white px-6 py-8">
+      <div className="max-w-6xl mx-auto">
+
+        {/* NAVIGATION */}
+
+        <nav className="flex items-center justify-between mb-16">
           <a
             href="/"
-            style={{
-              color: "#fff",
-              textDecoration: "none",
-              background: "#1b1b1b",
-              border: "1px solid #333",
-              padding: "10px 16px",
-              borderRadius: "10px",
-              fontSize: "14px",
-            }}
+            className="text-xl font-bold"
           >
-            Add Person
+            Agentic Dating
           </a>
 
-          <a
-            href="/rankings"
-            style={{
-              color: "#fff",
-              textDecoration: "none",
-              background: "#1b1b1b",
-              border: "1px solid #333",
-              padding: "10px 16px",
-              borderRadius: "10px",
-              fontSize: "14px",
-            }}
-          >
-            Rankings
-          </a>
+          <div className="flex items-center gap-6 text-sm">
+            <a
+              href="/"
+              className="text-gray-400 hover:text-white"
+            >
+              Add Person
+            </a>
 
-          <a
-            href="/date"
-            style={{
-              color: "#5eead4",
-              textDecoration: "none",
-              background: "#10201e",
-              border: "1px solid #5eead4",
-              padding: "10px 16px",
-              borderRadius: "10px",
-              fontSize: "14px",
-            }}
-          >
-            Agent Date
-          </a>
+            <a
+              href="/date"
+              className="text-white font-medium"
+            >
+              Agent Date
+            </a>
+
+            <a
+              href="/rankings"
+              className="text-gray-400 hover:text-white"
+            >
+              Rankings
+            </a>
+          </div>
         </nav>
 
-        {/* Header */}
-        <div style={{ marginBottom: "35px" }}>
-          <div
-            style={{
-              color: "#888",
-              fontSize: "13px",
-              letterSpacing: "2px",
-              textTransform: "uppercase",
-            }}
-          >
-            Live Agent Interaction
-          </div>
+        {/* HEADER */}
 
-          <h1
-            style={{
-              fontSize: "clamp(38px, 6vw, 60px)",
-              margin: "12px 0",
-              lineHeight: 1.05,
-            }}
-          >
-            Agents Are Dating
+        <section className="text-center mb-12">
+          <p className="text-xs tracking-[0.25em] text-gray-500 mb-4">
+            AGENT-TO-AGENT DATING
+          </p>
+
+          <h1 className="text-4xl md:text-6xl font-bold">
+            Two agents. One date.
           </h1>
 
-          <p
-            style={{
-              color: "#999",
-              fontSize: "17px",
-              lineHeight: 1.6,
-              maxWidth: "700px",
-            }}
-          >
-            Two autonomous person agents analyze each other's profiles,
-            start a conversation, discover shared interests and decide
-            whether they would continue dating.
+          <p className="text-gray-400 max-w-2xl mx-auto mt-5">
+            AI agents representing real people meet, talk,
+            discover shared interests and evaluate compatibility.
           </p>
-        </div>
+        </section>
 
-        {/* People */}
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "1fr 1fr",
-            gap: "14px",
-            marginBottom: "25px",
-          }}
-        >
-          <div
-            style={{
-              background: "#111",
-              border: "1px solid #292929",
-              borderRadius: "16px",
-              padding: "22px",
-            }}
-          >
-            <div
-              style={{
-                color: "#5eead4",
-                fontSize: "12px",
-                letterSpacing: "1.5px",
-                marginBottom: "8px",
-              }}
-            >
-              PERSON A
-            </div>
+        {/* TWO AGENTS */}
 
-            <h2
-              style={{
-                margin: "0 0 8px",
-                fontSize: "22px",
-              }}
-            >
-              {personA.name}
-            </h2>
+        <div className="grid md:grid-cols-2 gap-6 max-w-5xl mx-auto">
 
-            <div
-              style={{
-                color: "#888",
-                fontSize: "13px",
-                lineHeight: 1.5,
+          {/* PERSON A */}
+
+          <div className="border border-gray-800 rounded-2xl p-6 bg-gray-950">
+
+            <p className="text-xs text-gray-500 uppercase tracking-wider mb-4">
+              Agent A
+            </p>
+
+            <select
+              value={personA?.id ?? ""}
+              onChange={(event) => {
+                const selected = people.find(
+                  (person) =>
+                    person.id === Number(event.target.value)
+                );
+
+                if (selected) {
+                  setPersonA(selected);
+                  setResult(null);
+                }
               }}
+              className="w-full bg-black border border-gray-700 rounded-xl px-4 py-3 text-white"
             >
-              Person Agent
-            </div>
+              {people.map((person) => (
+                <option
+                  key={person.id}
+                  value={person.id}
+                >
+                  {person.name}
+                </option>
+              ))}
+            </select>
+
+            {personA && (
+              <div className="mt-6">
+
+                <h2 className="text-2xl font-semibold">
+                  {personA.name}
+                </h2>
+
+                <p className="text-sm text-gray-500 mt-2">
+                  AI agent representing {personA.name}
+                </p>
+
+                <div className="flex gap-4 mt-5 text-sm">
+
+                  <a
+                    href={personA.linkedin}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-blue-400 hover:text-blue-300"
+                  >
+                    LinkedIn ↗
+                  </a>
+
+                  <a
+                    href={personA.instagram}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-pink-400 hover:text-pink-300"
+                  >
+                    Instagram ↗
+                  </a>
+
+                </div>
+              </div>
+            )}
           </div>
 
-          <div
-            style={{
-              background: "#111",
-              border: "1px solid #292929",
-              borderRadius: "16px",
-              padding: "22px",
-            }}
-          >
-            <div
-              style={{
-                color: "#f472b6",
-                fontSize: "12px",
-                letterSpacing: "1.5px",
-                marginBottom: "8px",
-              }}
-            >
-              PERSON B
-            </div>
+          {/* PERSON B */}
 
-            <h2
-              style={{
-                margin: "0 0 8px",
-                fontSize: "22px",
-              }}
-            >
-              {personB.name}
-            </h2>
+          <div className="border border-gray-800 rounded-2xl p-6 bg-gray-950">
 
-            <div
-              style={{
-                color: "#888",
-                fontSize: "13px",
-                lineHeight: 1.5,
+            <p className="text-xs text-gray-500 uppercase tracking-wider mb-4">
+              Agent B
+            </p>
+
+            <select
+              value={personB?.id ?? ""}
+              onChange={(event) => {
+                const selected = people.find(
+                  (person) =>
+                    person.id === Number(event.target.value)
+                );
+
+                if (selected) {
+                  setPersonB(selected);
+                  setResult(null);
+                }
               }}
+              className="w-full bg-black border border-gray-700 rounded-xl px-4 py-3 text-white"
             >
-              Person Agent
-            </div>
+              {people.map((person) => (
+                <option
+                  key={person.id}
+                  value={person.id}
+                >
+                  {person.name}
+                </option>
+              ))}
+            </select>
+
+            {personB && (
+              <div className="mt-6">
+
+                <h2 className="text-2xl font-semibold">
+                  {personB.name}
+                </h2>
+
+                <p className="text-sm text-gray-500 mt-2">
+                  AI agent representing {personB.name}
+                </p>
+
+                <div className="flex gap-4 mt-5 text-sm">
+
+                  <a
+                    href={personB.linkedin}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-blue-400 hover:text-blue-300"
+                  >
+                    LinkedIn ↗
+                  </a>
+
+                  <a
+                    href={personB.instagram}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-pink-400 hover:text-pink-300"
+                  >
+                    Instagram ↗
+                  </a>
+
+                </div>
+              </div>
+            )}
           </div>
+
         </div>
 
-        {/* Start button */}
-        <button
-          onClick={startDate}
-          disabled={loading}
-          style={{
-            width: "100%",
-            padding: "16px 20px",
-            border: "none",
-            borderRadius: "12px",
-            background: loading ? "#333" : "#5eead4",
-            color: loading ? "#888" : "#000",
-            fontWeight: 700,
-            fontSize: "16px",
-            cursor: loading ? "not-allowed" : "pointer",
-            marginBottom: "30px",
-          }}
-        >
-          {loading
-            ? "Agents are talking..."
-            : "Start Agent-to-Agent Date →"}
-        </button>
+        {/* VS */}
 
-        {/* Error */}
+        <div className="text-center my-8">
+          <span className="inline-flex items-center justify-center w-12 h-12 rounded-full border border-gray-700 text-gray-400 font-semibold">
+            VS
+          </span>
+        </div>
+
+        {/* START DATE */}
+
+        <div className="text-center">
+
+          <button
+            onClick={startAgentDate}
+            disabled={dating}
+            className="px-8 py-4 rounded-xl bg-white text-black font-semibold hover:bg-gray-200 disabled:opacity-50 transition"
+          >
+            {dating
+              ? "Agents are dating..."
+              : "Start Agent Date →"}
+          </button>
+
+        </div>
+
+        {/* ERROR */}
+
         {error && (
-          <div
-            style={{
-              background: "#241414",
-              border: "1px solid #5c2929",
-              color: "#ff8a8a",
-              padding: "18px",
-              borderRadius: "12px",
-              marginBottom: "25px",
-            }}
-          >
+          <div className="max-w-3xl mx-auto mt-8 border border-red-900 bg-red-950/30 rounded-xl p-4 text-red-300">
             {error}
           </div>
         )}
 
-        {/* Loading */}
-        {loading && (
-          <div
-            style={{
-              textAlign: "center",
-              padding: "40px",
-              color: "#888",
-              background: "#111",
-              borderRadius: "16px",
-              border: "1px solid #222",
-            }}
-          >
-            <div
-              style={{
-                fontSize: "20px",
-                marginBottom: "10px",
-              }}
-            >
-              🤖 ↔ 🤖
-            </div>
+        {/* DATE RESULT */}
 
-            <div>
-              Person agents are analyzing each other and having a
-              conversation...
-            </div>
-          </div>
-        )}
+        {result && personA && personB && (
+          <section className="max-w-4xl mx-auto mt-16">
 
-        {/* Conversation */}
-        {date && (
-          <section>
-            <h2
-              style={{
-                fontSize: "26px",
-                marginBottom: "18px",
-              }}
-            >
-              Agent Conversation
-            </h2>
+            {/* RESULT HEADER */}
 
-            <div
-              style={{
-                display: "grid",
-                gap: "12px",
-              }}
-            >
-              {date.conversation?.map((message, index) => {
-                const isA =
-                  message.agent.toLowerCase().includes("person a");
+            <div className="text-center mb-12">
 
-                return (
-                  <div
-                    key={index}
-                    style={{
-                      display: "flex",
-                      justifyContent: isA
-                        ? "flex-start"
-                        : "flex-end",
-                    }}
-                  >
-                    <div
-                      style={{
-                        maxWidth: "75%",
-                        background: isA ? "#151515" : "#10201e",
-                        border: isA
-                          ? "1px solid #292929"
-                          : "1px solid #28524d",
-                        borderRadius: "16px",
-                        padding: "16px 18px",
-                      }}
-                    >
-                      <div
-                        style={{
-                          fontSize: "12px",
-                          color: isA
-                            ? "#5eead4"
-                            : "#f472b6",
-                          marginBottom: "7px",
-                          fontWeight: 600,
-                        }}
-                      >
-                        {message.agent}
-                      </div>
+              <p className="text-xs tracking-[0.2em] text-gray-500">
+                AGENT DATE COMPLETE
+              </p>
 
-                      <div
-                        style={{
-                          color: "#ddd",
-                          lineHeight: 1.6,
-                          fontSize: "15px",
-                        }}
-                      >
-                        {message.message}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+              <h2 className="text-3xl md:text-4xl font-bold mt-3">
+                {personA.name}
+                <span className="text-gray-600 mx-3">
+                  ×
+                </span>
+                {personB.name}
+              </h2>
 
-            {/* Result */}
-            {date.result && (
-              <div
-                style={{
-                  marginTop: "30px",
-                  background: "#111",
-                  border: "1px solid #292929",
-                  borderRadius: "18px",
-                  padding: "25px",
-                }}
-              >
-                <div
-                  style={{
-                    color: "#888",
-                    fontSize: "12px",
-                    letterSpacing: "1.5px",
-                    marginBottom: "10px",
-                  }}
-                >
-                  AGENT COMPATIBILITY RESULT
+              <div className="mt-8">
+
+                <div className="text-6xl font-bold">
+                  {result.result.compatibility_score}%
                 </div>
 
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    gap: "20px",
-                    flexWrap: "wrap",
-                  }}
-                >
-                  <div>
-                    <div
-                      style={{
-                        fontSize: "48px",
-                        fontWeight: 700,
-                        color: "#5eead4",
-                      }}
-                    >
-                      {date.result.compatibility_score}%
-                    </div>
+                <p className="text-gray-500 mt-2">
+                  Agent compatibility
+                </p>
 
-                    <div
-                      style={{
-                        color: "#999",
-                        marginTop: "4px",
-                        textTransform: "capitalize",
-                      }}
-                    >
-                      Decision: {date.result.decision}
-                    </div>
-                  </div>
-                </div>
-
-                {date.result.summary && (
-                  <p
-                    style={{
-                      color: "#bbb",
-                      lineHeight: 1.7,
-                      marginTop: "22px",
-                    }}
-                  >
-                    {date.result.summary}
-                  </p>
-                )}
-
-                {date.result.shared_interests?.length > 0 && (
-                  <div style={{ marginTop: "22px" }}>
-                    <h3 style={{ fontSize: "16px" }}>
-                      Shared Interests
-                    </h3>
-
-                    <div
-                      style={{
-                        display: "flex",
-                        flexWrap: "wrap",
-                        gap: "8px",
-                        marginTop: "10px",
-                      }}
-                    >
-                      {date.result.shared_interests.map(
-                        (interest, index) => (
-                          <span
-                            key={index}
-                            style={{
-                              background: "#1b1b1b",
-                              border: "1px solid #333",
-                              padding: "8px 12px",
-                              borderRadius: "20px",
-                              color: "#bbb",
-                              fontSize: "13px",
-                            }}
-                          >
-                            {interest}
-                          </span>
-                        )
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {date.result.compatibility_reasons?.length > 0 && (
-                  <div style={{ marginTop: "22px" }}>
-                    <h3 style={{ fontSize: "16px" }}>
-                      Compatibility Reasons
-                    </h3>
-
-                    <ul
-                      style={{
-                        color: "#aaa",
-                        lineHeight: 1.7,
-                        paddingLeft: "20px",
-                      }}
-                    >
-                      {date.result.compatibility_reasons.map(
-                        (reason, index) => (
-                          <li key={index}>{reason}</li>
-                        )
-                      )}
-                    </ul>
-                  </div>
-                )}
-
-                {date.result.potential_challenges?.length > 0 && (
-                  <div style={{ marginTop: "22px" }}>
-                    <h3 style={{ fontSize: "16px" }}>
-                      Potential Challenges
-                    </h3>
-
-                    <ul
-                      style={{
-                        color: "#888",
-                        lineHeight: 1.7,
-                        paddingLeft: "20px",
-                      }}
-                    >
-                      {date.result.potential_challenges.map(
-                        (challenge, index) => (
-                          <li key={index}>{challenge}</li>
-                        )
-                      )}
-                    </ul>
-                  </div>
-                )}
               </div>
-            )}
+            </div>
+
+            {/* CONVERSATION */}
+
+            <div className="mb-12">
+
+              <h3 className="text-2xl font-semibold mb-6">
+                Agent Conversation
+              </h3>
+
+              <div className="space-y-4">
+
+                {result.conversation.map(
+                  (message, index) => {
+
+                    const isAgentA =
+                      message.agent
+                        .toLowerCase()
+                        .includes(
+                          personA.name.toLowerCase()
+                        );
+
+                    return (
+                      <div
+                        key={index}
+                        className={`border border-gray-800 rounded-2xl p-5 ${
+                          isAgentA
+                            ? "bg-gray-900 mr-8"
+                            : "bg-gray-950 ml-8"
+                        }`}
+                      >
+
+                        <p className="text-xs text-gray-500 mb-2">
+                          {message.agent}
+                        </p>
+
+                        <p className="text-gray-200 leading-relaxed">
+                          {message.message}
+                        </p>
+
+                      </div>
+                    );
+                  }
+                )}
+
+              </div>
+            </div>
+
+            {/* ANALYSIS */}
+
+            <div className="border border-gray-800 rounded-2xl p-6 md:p-8">
+
+              <h3 className="text-2xl font-semibold mb-6">
+                Compatibility Analysis
+              </h3>
+
+              <p className="text-gray-300 leading-relaxed mb-8">
+                {result.result.summary}
+              </p>
+
+              {/* SHARED INTERESTS */}
+
+              {result.result.shared_interests?.length > 0 && (
+                <div className="mb-7">
+
+                  <p className="text-sm text-gray-500 mb-3">
+                    Shared interests
+                  </p>
+
+                  <div className="flex flex-wrap gap-2">
+
+                    {result.result.shared_interests.map(
+                      (interest, index) => (
+                        <span
+                          key={index}
+                          className="px-3 py-1.5 rounded-full border border-gray-800 bg-black text-sm text-gray-300"
+                        >
+                          {interest}
+                        </span>
+                      )
+                    )}
+
+                  </div>
+                </div>
+              )}
+
+              {/* REASONS */}
+
+              {result.result.compatibility_reasons?.length > 0 && (
+                <div className="mb-7">
+
+                  <p className="text-sm text-gray-500 mb-3">
+                    Compatibility factors
+                  </p>
+
+                  <ul className="space-y-2 text-gray-300">
+
+                    {result.result.compatibility_reasons.map(
+                      (reason, index) => (
+                        <li key={index}>
+                          • {reason}
+                        </li>
+                      )
+                    )}
+
+                  </ul>
+                </div>
+              )}
+
+              {/* CHALLENGES */}
+
+              {result.result.potential_challenges?.length > 0 && (
+                <div className="mb-7">
+
+                  <p className="text-sm text-gray-500 mb-3">
+                    Potential differences
+                  </p>
+
+                  <ul className="space-y-2 text-gray-400">
+
+                    {result.result.potential_challenges.map(
+                      (challenge, index) => (
+                        <li key={index}>
+                          • {challenge}
+                        </li>
+                      )
+                    )}
+
+                  </ul>
+                </div>
+              )}
+
+              {/* DECISION */}
+
+              <div className="border-t border-gray-800 pt-6">
+
+                <p className="text-sm text-gray-500 mb-2">
+                  Agent decision
+                </p>
+
+                <p className="text-xl font-semibold capitalize">
+                  {result.result.decision}
+                </p>
+
+              </div>
+
+            </div>
+
           </section>
         )}
+
       </div>
     </main>
   );
